@@ -1,3 +1,5 @@
+// server.js
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -9,37 +11,47 @@ app.use(bodyParser.json());
 
 const PORT = process.env.PORT || 3000;
 
+// POST /generate
+// Recibe { source, destination, amount, asset_code?, asset_issuer?, network }
+// Devuelve { xdr, network }
 app.post('/generate', async (req, res) => {
   try {
     const { source, destination, amount, asset_code, asset_issuer, network } = req.body;
+    console.log('📦 Payload recibido:', req.body);
 
-    console.log('📦 Payload recibido:', JSON.stringify(req.body, null, 2));
-
+    // Validaciones básicas
     if (!source || !destination || !amount || !network) {
       return res.status(400).json({ error: 'Faltan parámetros obligatorios.' });
     }
 
-    const horizonURL = network === 'public'
-      ? 'https://horizon.stellar.org'
-      : 'https://horizon-testnet.stellar.org';
+    // Elegir URL de Horizon según la red
+    const horizonUrl =
+      network === 'public'
+        ? 'https://horizon.stellar.org'
+        : 'https://horizon-testnet.stellar.org';
 
-    const server = new Server(horizonURL);
+    const server = new Server(horizonUrl);
     const sourceAccount = await server.loadAccount(source);
 
-    const networkPassphrase = network === 'public' ? Networks.PUBLIC : Networks.TESTNET;
+    // Elegir passphrase según la red
+    const networkPassphrase =
+      network === 'public' ? Networks.PUBLIC : Networks.TESTNET;
 
+    // Definir el asset (nativo o personalizado)
     const asset = asset_code && asset_issuer
       ? new Asset(asset_code, asset_issuer)
       : Asset.native();
 
+    // Construir la transacción
+    const baseFee = await server.fetchBaseFee();
     const tx = new TransactionBuilder(sourceAccount, {
-      fee: (await server.fetchBaseFee()).toString(),
-      networkPassphrase
+      fee: baseFee.toString(),
+      networkPassphrase,
     })
       .addOperation(Operation.payment({
         destination,
         asset,
-        amount: parseFloat(amount).toFixed(2).toString()
+        amount: parseFloat(amount).toFixed(2).toString(),
       }))
       .setTimeout(30)
       .build();
@@ -51,12 +63,14 @@ app.post('/generate', async (req, res) => {
   } catch (error) {
     console.error('❌ Error al generar XDR:', error);
     return res.status(500).json({
-      error: 'Bad Request',
-      detail: error.message || error.stack
+      error: error.message,
+      detail: error.response?.data || error.stack,
     });
   }
 });
 
+// GET /
+// Health­check
 app.get('/', (req, res) => {
   res.send('✅ Servicio Stellar XDR listo.');
 });
