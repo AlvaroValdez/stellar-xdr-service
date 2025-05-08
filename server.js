@@ -13,6 +13,10 @@ app.use(bodyParser.json());
 
 // Endpoint de generación de XDR
 app.post('/generate', async (req, res) => {
+
+  console.log('🔍 [DEBUG] Payload recibido en /generate:', JSON.stringify(req.body, null, 2));
+
+
   try {
     const { source, destination, amount, asset_code, asset_issuer, network } = req.body;
     if (!source || !destination || !amount || !network) {
