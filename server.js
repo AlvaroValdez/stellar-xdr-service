@@ -22,61 +22,59 @@ const HORIZON = {
   testnet: 'https://horizon-testnet.stellar.org',
 };
 
+// server.js (solo la parte del POST /generate)
 app.post('/generate', async (req, res) => {
   try {
-    // 🔥 Asegúrate de que los campos coincidan exactamente
     const { source, destination, amount, asset_code, asset_issuer, network } = req.body;
 
-    // 1. Validación mínima
-    if (![source, destination, amount, asset_code, asset_issuer, network].every(Boolean)) {
+    // 1️⃣ Validación mínima
+    if (![source, destination, amount, asset_code, network].every(Boolean)) {
       return res.status(400).json({ error: 'Faltan campos obligatorios.' });
+    }
+    // Si no es XLM, asset_issuer es obligatorio
+    if (asset_code !== 'XLM' && !asset_issuer) {
+      return res.status(400).json({ error: 'Para activos custom, asset_issuer es obligatorio.' });
     }
     if (!['public','testnet'].includes(network)) {
       return res.status(400).json({ error: 'Network debe ser "public" o "testnet".' });
     }
 
-    // 2. Conectar a Horizon
+    // 2️⃣ Conectar a Horizon
     const server = new Server(HORIZON[network]);
 
-    // 3. Cargar la cuenta “source”
-    //    —> si "source" no es una G... entonces aquí fallará con "invalid_field: account_id"
+    // 3️⃣ Cargar la cuenta “source”
     const account = await server.loadAccount(source);
 
-    // 4. Elegir el activo
+    // 4️⃣ Elegir el activo
     const asset = asset_code === 'XLM'
       ? Asset.native()
       : new Asset(asset_code, asset_issuer);
 
-    // 5. Construir la transacción
+    // 5️⃣ Construir la transacción
     const tx = new TransactionBuilder(account, {
-      fee: await server.fetchBaseFee(),                       // BASE_FEE
+      fee: await server.fetchBaseFee(),
       networkPassphrase: network === 'public'
         ? Networks.PUBLIC
         : Networks.TESTNET,
     })
       .addOperation(
-        // Aquí asumo que es un pago sencillo; ajusta si usas otros ops
-        StellarSdk.Operation.payment({
-          destination,
-          asset,
-          amount: amount.toString(),
-        })
+        Operation.payment({ destination, asset, amount: amount.toString() })
       )
       .setTimeout(30)
       .build();
 
-    // 6. Devolver el XDR
+    // 6️⃣ Devolver el XDR
     return res.json({ xdr: tx.toXDR(), network });
 
   } catch (err) {
     console.error('❌ Error al generar XDR:', err);
-    // Si Horizon rechaza algo, devuelve el mensaje crudo
     return res.status(500).json({
       error: 'Bad Request',
       detail: err.response?.data || err.toString(),
     });
   }
 });
+
 
 // Poner a escuchar
 const PORT = process.env.PORT || 3000;
