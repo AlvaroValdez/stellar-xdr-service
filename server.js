@@ -19,10 +19,12 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Endpoints de Horizon
-const HORIZON_URLS = {
-  public: 'https://horizon.stellar.org',
-  testnet: 'https://horizon-testnet.stellar.org',
-};
+// choose horizon per network
+function horizonFor(net) {
+  return net === 'public'
+    ? 'https://horizon.stellar.org'
+    : 'https://horizon-testnet.stellar.org';
+}
 
 // Health‐check
 app.get('/', (_req, res) => {
@@ -32,36 +34,20 @@ app.get('/', (_req, res) => {
 // POST /generate
 // Genera y devuelve el XDR de una transacción de pago
 app.post('/generate', async (req, res) => {
+  const { source, destination, amount, asset_code, asset_issuer, network } = req.body;
+  if (!source || !destination || !amount || !asset_code || !network) {
+    return res.status(400).json({ error: 'Faltan campos obligatorios.' });
+  }
   try {
-    const { source, destination, amount, asset_code, asset_issuer, network } = req.body;
-
-    // 1) Validaciones básicas
-    if (!source || !destination || !amount || !asset_code || !network) {
-      return res.status(400).json({ error: 'Faltan campos obligatorios.' });
-    }
-    if (asset_code !== 'XLM' && !asset_issuer) {
-      return res.status(400).json({
-        error: 'Para activos no nativos, asset_issuer es obligatorio.',
-      });
-    }
-    if (!['public', 'testnet'].includes(network)) {
-      return res.status(400).json({
-        error: 'Network debe ser "public" o "testnet".',
-      });
-    }
-
-    // 2) Conectar a Horizon y cargar cuenta
-    const server = new Server(HORIZON_URLS[network]);
+    console.log('[DEBUG] Payload recibido en /generate:', req.body);
+    const server = new Server(horizonFor(network));
+    // this is where invalid account_id would blow up
     const account = await server.loadAccount(source);
-
-    // 3) Crear el Asset
-    const asset =
+    const fee     = await server.fetchBaseFee();
+    const asset   =
       asset_code === 'XLM'
         ? Asset.native()
         : new Asset(asset_code, asset_issuer);
-
-    // 4) Construir la transacción
-    const fee = await server.fetchBaseFee();
     const tx = new TransactionBuilder(account, {
       fee,
       networkPassphrase:
@@ -71,25 +57,19 @@ app.post('/generate', async (req, res) => {
         Operation.payment({
           destination,
           asset,
-          amount: amount.toString(),
+          amount,
         })
       )
       .setTimeout(30)
       .build();
-
-    // 5) Devolver el XDR
     return res.json({ xdr: tx.toXDR(), network });
   } catch (err) {
-    console.error('❌ Error al generar XDR:', err);
+    console.error('Error al generar XDR:', err);
     return res.status(500).json({
-      error: 'Bad Request',
-      detail: err.message || err.toString(),
+      error: err.name,
+      detail: err.message,
     });
   }
 });
-
-// Arrancar servidor
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`🚀 Stellar XDR service escuchando en puerto ${PORT}`)
-);
+app.listen(PORT, () => console.log(`XDR service listening on ${PORT}`));
