@@ -33,6 +33,6 @@ app.use((err, _req, res, _next) => {
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(
-    `🚀 Stellar XDR Service corriendo en puerto ${PORT} (network: ${NETWORK})`
+    `🚀 Stellar XDR Service corriendo en puerto ${PORT})`
   );
 });
