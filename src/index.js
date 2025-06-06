@@ -1,47 +1,39 @@
 // src/index.js
-
-console.log('ENV →', {
-  HORIZON_URL: process.env.HORIZON_URL?.slice(0, 20) + (process.env.HORIZON_URL?.length > 20 ? '…' : ''),
-  NETWORK: process.env.NETWORK,
-  SECRET_JWT: process.env.SECRET_JWT ? '(ok)' : '(missing)',
-  PORT: process.env.PORT,
-});
-
-
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
-const xdrRouter = require('./routes/xdr');
-const { verifyJwt } = require('./middlewares/authMiddleware');
-const { errorHandler } = require('./middlewares/errorHandler');
+const bodyParser = require('body-parser');
+const { generateXdr } = require('./controllers/xdrController');
+const { NETWORK } = require('./config');
 
 const app = express();
-
-// 1. Middleware de CORS (ajusta origin si necesitas restringir)
-app.use(cors({ origin: '*' }));
-
-// 2. Parseo de JSON
-app.use(express.json({ limit: '1mb' }));
-
-// 3. Middleware de logs básicos (petición / body)
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - Body:`, req.body);
-  next();
-});
-
-// 4. Health check (misma ruta /health que usan otros servicios)
-app.get('/health', (_req, res) => {
-  return res.status(200).json({ status: 'HEALTH OK' });
-});
-
-// 5. Rutas protegidas con JWT (misma lógica que en stellar-signing-service)
-app.use('/api/xdr', verifyJwt, xdrRouter);
-
-// 6. Handler de errores centralizado (misma convención que en remesas-api y signing-service)
-app.use(errorHandler);
-
-// 7. Levantamos el servidor en el puerto indicado por Railway o .env
 const PORT = process.env.PORT || 3001;
+
+// Middleware para parsear JSON
+app.use(bodyParser.json());
+
+// Health check
+app.get('/health', (req, res) => {
+  console.log('[Health] Petición recibida en /health');
+  res.json({ status: 'ok', network: NETWORK });
+});
+
+// Endpoint para generar XDR
+app.post('/generate-xdr', generateXdr);
+
+// Catch-all 404
+app.use((_req, res) => {
+  res.status(404).json({ error: 'Ruta no encontrada.' });
+});
+
+// Manejador genérico de errores
+app.use((err, _req, res, _next) => {
+  console.error('[XDR_SERVICE] Error no manejado:', err);
+  res.status(500).json({ error: 'Error interno en el servicio.' });
+});
+
+// Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`✨ Stellar XDR Service escuchando en puerto ${PORT}`);
+  console.log(
+    `🚀 Stellar XDR Service corriendo en puerto ${PORT} (network: ${NETWORK})`
+  );
 });
