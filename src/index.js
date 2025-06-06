@@ -1,4 +1,13 @@
 // src/index.js
+
+console.log('ENV →', {
+  HORIZON_URL: process.env.HORIZON_URL?.slice(0, 20) + (process.env.HORIZON_URL?.length > 20 ? '…' : ''),
+  NETWORK: process.env.NETWORK,
+  SECRET_JWT: process.env.SECRET_JWT ? '(ok)' : '(missing)',
+  PORT: process.env.PORT,
+});
+
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
