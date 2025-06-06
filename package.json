@@ -1,0 +1,21 @@
+{
+  "name": "stellar-xdr-service",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "cross-env NODE_ENV=test jest"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.x",
+    "express": "^4.x",
+    "jsonwebtoken": "^9.0.2",
+    "stellar-sdk": "^10.x"
+  },
+  "devDependencies": {
+    "cross-env": "^7.x",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
+  }
+}
