@@ -30,9 +30,7 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Error interno en el servicio.' });
 });
 
-// Iniciar servidor
+// ————— Iniciar servidor ————————————————————————————————————
 app.listen(PORT, () => {
-  console.log(
-    `🚀 Stellar XDR Service corriendo en puerto ${PORT})`
-  );
+  console.log(`🚀 Stellar XDR Service corriendo en puerto http://localhost:${PORT}`);
 });
